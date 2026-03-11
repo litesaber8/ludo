@@ -103,10 +103,10 @@ export default function LudoGame() {
     // RANGE ATTACK: check pieces within range
     const currentGlobal = getGlobalIndex(newPos, piece.color);
     if (newPos >= 0 && newPos < 52) {
-      updatedPlayers.forEach((player, pIdx) => {
+      updatedPlayers.forEach((player: Player, pIdx: number) => {
         if (pIdx === gameState.currentPlayerIndex) return;
         
-        player.pieces.forEach((otherPiece) => {
+        player.pieces.forEach((otherPiece: Piece) => {
           if (otherPiece.position < 0 || otherPiece.position >= 52) return;
           
           const otherGlobal = getGlobalIndex(otherPiece.position, otherPiece.color);
