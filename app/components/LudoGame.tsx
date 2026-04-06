@@ -273,7 +273,7 @@ export default function LudoGame() {
               const hoveredPiece = hoveredPieceId ? gameState.players.flatMap(p => p.pieces).find(p => p.id === hoveredPieceId) : null;
               
               // Highlight range for current player's pieces when waiting for move
-              let rangeHighlight = false;
+              let rangeHighlightColor: Color | null = null;
               
               let pathIdx = -1;
               for (let g = 0; g < 52; g++) {
@@ -286,18 +286,27 @@ export default function LudoGame() {
                   if (p.position >= 0 && p.position < 52) {
                     const pGlobal = getGlobalIndex(p.position, p.color);
                     let dist = Math.abs(pGlobal - pathIdx);
-                    if (Math.min(dist, 52 - dist) <= p.range) rangeHighlight = true;
+                    if (Math.min(dist, 52 - dist) <= p.range) rangeHighlightColor = p.color;
                   }
                 });
               }
 
               if (pathIdx !== -1) {
                 bgColor = 'bg-slate-50 border border-slate-200';
-                if (rangeHighlight) bgColor = 'bg-blue-400/20 animate-pulse';
+                
+                if (rangeHighlightColor) {
+                  const colorMap = { red: 'bg-red-400/20', blue: 'bg-blue-400/20', yellow: 'bg-yellow-400/20', green: 'bg-green-400/20' };
+                  bgColor = `${colorMap[rangeHighlightColor]} animate-pulse`;
+                  content = <div className={`w-1.5 h-1.5 rounded-full opacity-40 ${rangeHighlightColor === 'red' ? 'bg-red-500' : rangeHighlightColor === 'blue' ? 'bg-blue-500' : rangeHighlightColor === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`} />;
+                }
                 
                 if (hoveredPiece && hoveredPiece.position >= 0 && hoveredPiece.position < 52) {
                   const dist = Math.abs(getGlobalIndex(hoveredPiece.position, hoveredPiece.color) - pathIdx);
-                  if (Math.min(dist, 52 - dist) <= hoveredPiece.range && dist > 0) bgColor = 'bg-blue-400/40 animate-pulse';
+                  if (Math.min(dist, 52 - dist) <= hoveredPiece.range && dist > 0) {
+                    const colorMap = { red: 'bg-red-400/40', blue: 'bg-blue-400/40', yellow: 'bg-yellow-400/40', green: 'bg-green-400/40' };
+                    bgColor = `${colorMap[hoveredPiece.color]} animate-pulse`;
+                    content = <div className={`w-2 h-2 rounded-full opacity-60 ${hoveredPiece.color === 'red' ? 'bg-red-500' : hoveredPiece.color === 'blue' ? 'bg-blue-500' : hoveredPiece.color === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`} />;
+                  }
                 }
                 const buff = BUFF_LOCATIONS[pathIdx];
                 if (buff === 'BUFF_HEAL') content = <span className="text-pink-500">♥</span>;
