@@ -11,6 +11,7 @@ export default function LudoGame() {
     diceValue: 0,
     isGameOver: false,
     gameLog: ['Game started! Red player turn.'],
+    winners: [],
   });
   const [isRolling, setIsRolling] = useState(false);
   const [waitingForMove, setWaitingForMove] = useState(false);
@@ -20,7 +21,7 @@ export default function LudoGame() {
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
 
   const rollDice = useCallback(() => {
-    if (isRolling || waitingForMove) return;
+    if (isRolling || waitingForMove || gameState.isGameOver) return;
     setIsRolling(true);
     setSelectedPieceId(null);
     
@@ -140,13 +141,36 @@ export default function LudoGame() {
     }
 
     // Update state
-    setGameState(prev => ({
-      ...prev,
-      players: updatedPlayers,
-      currentPlayerIndex: roll === 6 ? prev.currentPlayerIndex : (prev.currentPlayerIndex + 1) % 4,
-      diceValue: 0,
-      gameLog: [...newLog, ...prev.gameLog].slice(0, 10)
-    }));
+    const isPlayerFinished = updatedPlayers[gameState.currentPlayerIndex].pieces.every((p: Piece) => p.position === 57);
+    let newWinners = [...gameState.winners];
+    if (isPlayerFinished && !newWinners.includes(currentPlayer.name)) {
+      newWinners.push(currentPlayer.name);
+      newLog.push(`🏆 ${currentPlayer.name} has finished!`);
+    }
+
+    const activePlayers = updatedPlayers.filter((p: Player) => !p.pieces.every(pc => pc.position === 57));
+    const isGameOver = activePlayers.length <= 1;
+
+    setGameState(prev => {
+      const nextPlayerIndex = (prev.currentPlayerIndex + 1) % 4;
+      // Skip players who have finished
+      let finalNextIndex = nextPlayerIndex;
+      if (!isGameOver) {
+        while (updatedPlayers[finalNextIndex].pieces.every((p: Piece) => p.position === 57)) {
+          finalNextIndex = (finalNextIndex + 1) % 4;
+        }
+      }
+
+      return {
+        ...prev,
+        players: updatedPlayers,
+        currentPlayerIndex: roll === 6 && !isPlayerFinished ? prev.currentPlayerIndex : finalNextIndex,
+        diceValue: 0,
+        gameLog: [...newLog, ...prev.gameLog].slice(0, 10),
+        winners: newWinners,
+        isGameOver: isGameOver
+      };
+    });
     
     setWaitingForMove(false);
   };
@@ -160,7 +184,7 @@ export default function LudoGame() {
   }, [currentPlayer.isBot, isRolling, waitingForMove, gameState.isGameOver, rollDice]);
 
   useEffect(() => {
-    if (currentPlayer.isBot && waitingForMove) {
+    if (currentPlayer.isBot && waitingForMove && !gameState.isGameOver) {
       const timer = setTimeout(() => {
         const moveablePieces = currentPlayer.pieces.filter(p => {
           if (p.position === -1 && gameState.diceValue === 6) return true;
@@ -171,10 +195,16 @@ export default function LudoGame() {
           movePiece(moveablePieces[0].id);
         } else {
           setWaitingForMove(false);
-          setGameState(prev => ({
-            ...prev,
-            currentPlayerIndex: (prev.currentPlayerIndex + 1) % 4
-          }));
+          setGameState(prev => {
+            let nextIndex = (prev.currentPlayerIndex + 1) % 4;
+            while (prev.players[nextIndex].pieces.every(p => p.position === 57)) {
+              nextIndex = (nextIndex + 1) % 4;
+            }
+            return {
+              ...prev,
+              currentPlayerIndex: nextIndex
+            };
+          });
         }
       }, 1000);
       return () => clearTimeout(timer);
@@ -304,46 +334,80 @@ export default function LudoGame() {
           </div>
 
           {/* Active Pieces Rendering (Overlay) */}
-          {gameState.players.map(player => 
-            player.pieces.filter(p => p.position >= 0 && p.position < 100).map(piece => {
-              const [row, col] = getTileCoords(getGlobalIndex(piece.position, piece.color), piece.color, piece.position);
-              const isSelected = selectedPieceId === piece.id;
-              
-              return (
-                <div 
-                  key={piece.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    movePiece(piece.id);
-                    setSelectedPieceId(piece.id);
-                  }}
-                  className={`absolute w-[28px] h-[28px] rounded-full border-2 border-white flex flex-col items-center justify-center cursor-pointer shadow-lg transition-all duration-300 hover:scale-110 z-20
-                    ${isSelected ? 'ring-4 ring-yellow-400 scale-125 z-30' : ''}
+          {gameState.players.map(player => {
+            const piecesByPosition: { [key: number]: Piece[] } = {};
+            player.pieces.forEach(p => {
+              if (p.position >= 0 && p.position < 58) {
+                if (!piecesByPosition[p.position]) piecesByPosition[p.position] = [];
+                piecesByPosition[p.position].push(p);
+              }
+            });
+
+            return Object.entries(piecesByPosition).flatMap(([posStr, pieces]) => {
+              return pieces.map((piece, index) => {
+                const pos = parseInt(posStr);
+                const [row, col] = getTileCoords(getGlobalIndex(pos, piece.color), piece.color, pos);
+                const isSelected = selectedPieceId === piece.id;
+                const offset = index * 4; // Offset for stacked pieces
+
+                return (
+                  <div
+                    key={piece.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (gameState.currentPlayerIndex === gameState.players.findIndex(pl => pl.color === piece.color)) {
+                        movePiece(piece.id);
+                        setSelectedPieceId(piece.id);
+                      }
+                    }}
+                    className={`absolute w-[28px] h-[28px] rounded-full border-2 border-white flex flex-col items-center justify-center cursor-pointer shadow-lg transition-all duration-300 hover:scale-110
+                    ${isSelected ? 'ring-4 ring-yellow-400 scale-125 z-40' : 'z-20'}
                     ${player.color === 'red' ? 'bg-red-500' : player.color === 'blue' ? 'bg-blue-500' : player.color === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`}
-                  style={{
-                    left: `${col * 30 + 15}px`,
-                    top: `${row * 30 + 15}px`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <div className="text-[12px] font-black text-white leading-none">{piece.hp}</div>
-                  {isSelected && (
-                    <div className="absolute -top-10 bg-slate-900 text-white p-1 rounded border border-yellow-400 text-[10px] whitespace-nowrap z-50 shadow-2xl">
-                      HP:{piece.hp} ATK:{piece.attack} RNG:{piece.range}
+                    style={{
+                      left: `${col * 30 + 15 + offset}px`,
+                      top: `${row * 30 + 15 - offset}px`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div className="text-[12px] font-black text-white leading-none">{piece.hp}</div>
+                    {isSelected && (
+                      <div className="absolute -top-10 bg-slate-900 text-white p-1 rounded border border-yellow-400 text-[10px] whitespace-nowrap z-50 shadow-2xl">
+                        HP:{piece.hp} ATK:{piece.attack} RNG:{piece.range}
+                      </div>
+                    )}
+                    <div className="flex gap-[1px]">
+                      <div className="text-[7px] font-bold text-white/90 leading-none">⚔{piece.attack}</div>
+                      <div className="text-[7px] font-bold text-white/90 leading-none">🎯{piece.range}</div>
                     </div>
-                  )}
-                  <div className="flex gap-[1px]">
-                    <div className="text-[7px] font-bold text-white/90 leading-none">⚔{piece.attack}</div>
-                    <div className="text-[7px] font-bold text-white/90 leading-none">🎯{piece.range}</div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              });
+            });
+          })}
         </div>
 
         {/* CONTROLS & LOGS */}
         <div className="flex flex-col gap-4 w-80">
+          {/* Winner Board */}
+          {gameState.winners.length > 0 && (
+            <div className="bg-slate-800 p-4 rounded-xl border-2 border-green-500 shadow-xl">
+              <h3 className="text-xs font-black text-green-500 uppercase tracking-widest mb-2">Winners Board</h3>
+              <div className="space-y-1">
+                {gameState.winners.map((name, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-lg">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅'}</span>
+                    <span className="font-bold">{name}</span>
+                  </div>
+                ))}
+              </div>
+              {gameState.isGameOver && (
+                <div className="mt-4 text-center text-xl font-black text-yellow-400 animate-bounce">
+                  GAME OVER!
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Piece Stats Detail */}
           {selectedPieceId ? (
             <div className="bg-slate-800 p-4 rounded-xl border-2 border-yellow-400 shadow-xl animate-pulse">

@@ -39,4 +39,5 @@ export interface GameState {
   diceValue: number;
   isGameOver: boolean;
   gameLog: string[];
+  winners: string[]; // List of player names in order of winning
 }
