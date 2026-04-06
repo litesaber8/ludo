@@ -316,11 +316,20 @@ export default function LudoGame() {
                 return (
                   <div 
                     key={i} 
-                    onMouseEnter={() => setFocusedTile({ globalIdx: pathIdx })}
+                    onMouseEnter={() => {
+                      const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
+                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                    }}
                     onMouseLeave={() => setFocusedTile(null)}
-                    onMouseDown={() => setFocusedTile({ globalIdx: pathIdx })}
+                    onMouseDown={() => {
+                      const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
+                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                    }}
                     onMouseUp={() => setFocusedTile(null)}
-                    onTouchStart={() => setFocusedTile({ globalIdx: pathIdx })}
+                    onTouchStart={() => {
+                      const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
+                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                    }}
                     onTouchEnd={() => setFocusedTile(null)}
                     className={`${bgColor} flex items-center justify-center cursor-pointer select-none`}
                   >
@@ -337,11 +346,20 @@ export default function LudoGame() {
                     return (
                       <div 
                         key={i} 
-                        onMouseEnter={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
+                        onMouseEnter={() => {
+                          const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
+                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                        }}
                         onMouseLeave={() => setFocusedTile(null)}
-                        onMouseDown={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
+                        onMouseDown={() => {
+                          const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
+                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                        }}
                         onMouseUp={() => setFocusedTile(null)}
-                        onTouchStart={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
+                        onTouchStart={() => {
+                          const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
+                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                        }}
                         onTouchEnd={() => setFocusedTile(null)}
                         className={`${bgColor} flex items-center justify-center cursor-pointer border border-white/20 select-none`}
                       >
