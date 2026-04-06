@@ -29,6 +29,30 @@ export default function LudoGame() {
   const [attackingPieceId, setAttackingPieceId] = useState<string | null>(null);
   const [focusTimer, setFocusTimer] = useState<NodeJS.Timeout | null>(null);
   
+  // Pre-calculate range highlights to avoid heavy computation during render
+  const rangeHighlights = React.useMemo(() => {
+    const highlights: Record<number, Color> = {};
+    if (!gameStarted) return highlights;
+
+    gameState.players.forEach(player => {
+      player.pieces.forEach(p => {
+        if (p.position >= 0 && p.position < 52) {
+          const pGlobal = getGlobalIndex(p.position, p.color);
+          // Only check nearby tiles to be efficient (max range is usually small)
+          const range = p.range;
+          for (let r = 1; r <= range; r++) {
+            const nextIdx = (pGlobal + r) % 52;
+            const prevIdx = (pGlobal - r + 52) % 52;
+            // Last one wins if overlapping, or we could handle it differently
+            highlights[nextIdx] = p.color;
+            highlights[prevIdx] = p.color;
+          }
+        }
+      });
+    });
+    return highlights;
+  }, [gameState.players, gameStarted]);
+
   const currentPlayer = gameState.players[gameState.currentPlayerIndex] || { name: 'Player', color: 'red', pieces: [], isBot: false };
 
   const closeFocus = useCallback(() => {
@@ -317,7 +341,7 @@ export default function LudoGame() {
               else if (row > 8 && col > 8) bgColor = 'bg-yellow-500/20';
               else if (row >= 6 && row <= 8 && col >= 6 && col <= 8) bgColor = 'bg-slate-200';
 
-              // Highlight range for all pieces
+              // Highlight range for all pieces (using pre-calculated values)
               let rangeHighlightColor: Color | null = null;
               
               let pathIdx = -1;
@@ -326,20 +350,8 @@ export default function LudoGame() {
                 if (tr === row && tc === col) { pathIdx = g; break; }
               }
 
-              if (pathIdx !== -1) {
-                // Check all players' pieces for range highlight
-                gameState.players.forEach(player => {
-                  player.pieces.forEach(p => {
-                    if (p.position >= 0 && p.position < 52) {
-                      const pGlobal = getGlobalIndex(p.position, p.color);
-                      const dist = Math.abs(pGlobal - pathIdx);
-                      const circularDist = Math.min(dist, 52 - dist);
-                      if (circularDist <= p.range && circularDist > 0) {
-                        rangeHighlightColor = p.color;
-                      }
-                    }
-                  });
-                });
+              if (pathIdx !== -1 && rangeHighlights[pathIdx]) {
+                rangeHighlightColor = rangeHighlights[pathIdx];
               }
 
               if (pathIdx !== -1) {
@@ -488,11 +500,11 @@ export default function LudoGame() {
 
       {focusedTile && (
         <div 
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[90%] max-w-[280px]" 
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[90%] max-w-[280px] pointer-events-none" 
           onMouseEnter={keepFocus}
           onMouseLeave={closeFocus}
         >
-          <div className="bg-slate-800/95 backdrop-blur-md border border-slate-600 rounded-xl p-3 shadow-2xl relative overflow-hidden">
+          <div className="bg-slate-800 border border-slate-600 rounded-xl p-3 shadow-2xl relative overflow-hidden pointer-events-auto">
             <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400/30"></div>
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tile Details</h3>
