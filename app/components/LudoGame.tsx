@@ -28,6 +28,7 @@ export default function LudoGame() {
   const [hoveredPieceId, setHoveredPieceId] = useState<string | null>(null);
   const [hoveredTile, setHoveredTile] = useState<{ globalIdx?: number; color?: Color; localPos?: number } | null>(null);
   const [focusedTile, setFocusedTile] = useState<{ globalIdx: number; color?: Color; localPos?: number } | null>(null);
+  const [attackingPieceId, setAttackingPieceId] = useState<string | null>(null);
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex] || { name: 'Player', color: 'red', pieces: [], isBot: false };
 
@@ -125,6 +126,9 @@ export default function LudoGame() {
 
             let damage = updatedPiece.attack;
             if (damage > 0) {
+              setAttackingPieceId(piece.id);
+              setTimeout(() => setAttackingPieceId(null), 800);
+
               otherPiece.hp -= damage;
               if (otherPiece.hp <= 0) {
                 otherPiece.hp = 1;
@@ -267,6 +271,19 @@ export default function LudoGame() {
               else if (row >= 6 && row <= 8 && col >= 6 && col <= 8) bgColor = 'bg-slate-200';
 
               const hoveredPiece = hoveredPieceId ? gameState.players.flatMap(p => p.pieces).find(p => p.id === hoveredPieceId) : null;
+              
+              // Highlight range for current player's pieces when waiting for move
+              let rangeHighlight = false;
+              if (waitingForMove && !currentPlayer.isBot) {
+                currentPlayer.pieces.forEach(p => {
+                  if (p.position >= 0 && p.position < 52) {
+                    const pGlobal = getGlobalIndex(p.position, p.color);
+                    let dist = Math.abs(pGlobal - pathIdx);
+                    if (Math.min(dist, 52 - dist) <= p.range) rangeHighlight = true;
+                  }
+                });
+              }
+
               let pathIdx = -1;
               for (let g = 0; g < 52; g++) {
                 const [tr, tc] = getTileCoords(g);
@@ -275,6 +292,8 @@ export default function LudoGame() {
 
               if (pathIdx !== -1) {
                 bgColor = 'bg-slate-50 border border-slate-200';
+                if (rangeHighlight) bgColor = 'bg-blue-400/20 animate-pulse';
+                
                 if (hoveredPiece && hoveredPiece.position >= 0 && hoveredPiece.position < 52) {
                   const dist = Math.abs(getGlobalIndex(hoveredPiece.position, hoveredPiece.color) - pathIdx);
                   if (Math.min(dist, 52 - dist) <= hoveredPiece.range && dist > 0) bgColor = 'bg-blue-400/40 animate-pulse';
@@ -284,7 +303,19 @@ export default function LudoGame() {
                 else if (buff === 'BUFF_ATTACK') content = <span className="text-orange-500">⚔</span>;
                 else if (buff === 'BUFF_RANGE') content = <span className="text-blue-500">🎯</span>;
                 if (SAFE_ZONES.includes(pathIdx)) { bgColor = 'bg-slate-200'; content = <span className="text-slate-400 opacity-30">★</span>; }
-                return <div key={i} onClick={() => setFocusedTile({ globalIdx: pathIdx })} className={`${bgColor} flex items-center justify-center cursor-pointer`}>{content}</div>;
+                return (
+                  <div 
+                    key={i} 
+                    onMouseDown={() => setFocusedTile({ globalIdx: pathIdx })}
+                    onMouseUp={() => setFocusedTile(null)}
+                    onMouseLeave={() => setFocusedTile(null)}
+                    onTouchStart={() => setFocusedTile({ globalIdx: pathIdx })}
+                    onTouchEnd={() => setFocusedTile(null)}
+                    className={`${bgColor} flex items-center justify-center cursor-pointer select-none`}
+                  >
+                    {content}
+                  </div>
+                );
               }
 
               for (const color of ['red', 'blue', 'yellow', 'green'] as Color[]) {
@@ -292,7 +323,19 @@ export default function LudoGame() {
                   const [tr, tc] = getTileCoords(0, color, lp);
                   if (tr === row && tc === col) {
                     bgColor = color === 'red' ? 'bg-red-100' : color === 'blue' ? 'bg-blue-100' : color === 'yellow' ? 'bg-yellow-100' : 'bg-green-100';
-                    return <div key={i} onClick={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })} className={`${bgColor} flex items-center justify-center cursor-pointer border border-white/20`}>{content}</div>;
+                    return (
+                      <div 
+                        key={i} 
+                        onMouseDown={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
+                        onMouseUp={() => setFocusedTile(null)}
+                        onMouseLeave={() => setFocusedTile(null)}
+                        onTouchStart={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
+                        onTouchEnd={() => setFocusedTile(null)}
+                        className={`${bgColor} flex items-center justify-center cursor-pointer border border-white/20 select-none`}
+                      >
+                        {content}
+                      </div>
+                    );
                   }
                 }
               }
@@ -314,11 +357,26 @@ export default function LudoGame() {
           {/* Active Pieces */}
           {gameState.players.flatMap(player => player.pieces.filter(p => p.position >= 0 && p.position < 58).map(piece => {
             const [row, col] = getTileCoords(getGlobalIndex(piece.position, piece.color), piece.color, piece.position);
+            const isCurrentPlayerPiece = currentPlayer.color === piece.color;
+            const isAttacking = attackingPieceId === piece.id;
+            
             return (
-              <div key={piece.id} onClick={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); if (gameState.currentPlayerIndex === gameState.players.findIndex(pl => pl.color === piece.color) && waitingForMove) movePiece(piece.id); }}
-                className={`absolute w-[5.33%] h-[5.33%] rounded-full border border-white flex items-center justify-center cursor-pointer shadow-md transition-all duration-200 z-20 ${piece.color === 'red' ? 'bg-red-500' : piece.color === 'blue' ? 'bg-blue-500' : piece.color === 'yellow' ? 'bg-yellow-500' : piece.color === 'green' ? 'bg-green-500' : 'bg-slate-500'}`}
+              <div key={piece.id} 
+                onMouseDown={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
+                onMouseUp={() => setFocusedTile(null)}
+                onMouseLeave={() => setFocusedTile(null)}
+                onTouchStart={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
+                onTouchEnd={() => setFocusedTile(null)}
+                onClick={() => { if (isCurrentPlayerPiece && waitingForMove) movePiece(piece.id); }}
+                className={`absolute w-[5.33%] h-[5.33%] rounded-full border border-white flex items-center justify-center cursor-pointer shadow-md transition-all duration-200 ${isCurrentPlayerPiece && waitingForMove ? 'z-50 scale-125 border-yellow-400 border-2' : 'z-20'} ${piece.color === 'red' ? 'bg-red-500' : piece.color === 'blue' ? 'bg-blue-500' : piece.color === 'yellow' ? 'bg-yellow-500' : piece.color === 'green' ? 'bg-green-500' : 'bg-slate-500'}`}
                 style={{ left: `${(col / 15) * 100 + 3.33}%`, top: `${(row / 15) * 100 + 3.33}%`, transform: 'translate(-50%, -50%)' }}>
                 <span className="text-[8px] sm:text-[10px] font-black text-white">{piece.hp}</span>
+                {isAttacking && (
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl animate-bounce pointer-events-none z-[60]">
+                    ⚔️
+                    <div className="text-[10px] bg-red-600 text-white px-1 rounded-full font-bold">-{piece.attack}</div>
+                  </div>
+                )}
               </div>
             );
           }))}
