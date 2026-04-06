@@ -35,7 +35,7 @@ export default function LudoGame() {
     if (focusTimer) clearTimeout(focusTimer);
     const timer = setTimeout(() => {
       setFocusedTile(null);
-    }, 500); // 500ms delay to move mouse
+    }, 300); // 300ms delay to move mouse
     setFocusTimer(timer);
   }, [focusTimer]);
 
@@ -45,13 +45,34 @@ export default function LudoGame() {
   }, [focusTimer]);
 
   const openFocus = useCallback((data: { globalIdx: number; color?: Color; localPos?: number }) => {
+    // If it's the same tile, just clear the closing timer
+    if (focusedTile && 
+        focusedTile.globalIdx === data.globalIdx && 
+        focusedTile.color === data.color && 
+        focusedTile.localPos === data.localPos) {
+      if (focusTimer) clearTimeout(focusTimer);
+      setFocusTimer(null);
+      return;
+    }
+    
     if (focusTimer) clearTimeout(focusTimer);
     setFocusedTile(data);
     setFocusTimer(null);
-  }, [focusTimer]);
+  }, [focusTimer, focusedTile]);
 
   const rollDice = useCallback(() => {
     if (isRolling || waitingForMove || gameState.isGameOver) return;
+
+    // Check if current player is already finished (all pieces at 57)
+    const isCurrentPlayerFinished = currentPlayer.pieces.every(p => p.position === 57);
+    if (isCurrentPlayerFinished) {
+      setGameState(prev => ({
+        ...prev,
+        currentPlayerIndex: (prev.currentPlayerIndex + 1) % prev.players.length
+      }));
+      return;
+    }
+
     setIsRolling(true);
     setSelectedPieceId(null);
     
@@ -71,16 +92,24 @@ export default function LudoGame() {
       });
 
       if (!canMove) {
-        setGameState(prev => ({
-          ...prev,
-          gameLog: [`No possible moves for ${currentPlayer.name}`, ...prev.gameLog].slice(0, 10),
-          currentPlayerIndex: (prev.currentPlayerIndex + 1) % prev.players.length
-        }));
+        setGameState(prev => {
+          let nextIndex = (prev.currentPlayerIndex + 1) % prev.players.length;
+          // Skip finished players
+          while (prev.players[nextIndex].pieces.every(p => p.position === 57)) {
+            nextIndex = (nextIndex + 1) % prev.players.length;
+            if (nextIndex === prev.currentPlayerIndex) break; // Avoid infinite loop
+          }
+          return {
+            ...prev,
+            gameLog: [`No possible moves for ${currentPlayer.name}`, ...prev.gameLog].slice(0, 10),
+            currentPlayerIndex: nextIndex
+          };
+        });
       } else {
         setWaitingForMove(true);
       }
     }, 600);
-  }, [isRolling, waitingForMove, currentPlayer, gameState.currentPlayerIndex, gameState.players.length]);
+  }, [isRolling, waitingForMove, currentPlayer, gameState.currentPlayerIndex, gameState.players.length, gameState.isGameOver]);
 
   const movePiece = (pieceId: string) => {
     if (!waitingForMove) return;
@@ -402,6 +431,10 @@ export default function LudoGame() {
             const [row, col] = getTileCoords(getGlobalIndex(piece.position, piece.color), piece.color, piece.position);
             const isCurrentPlayerPiece = currentPlayer.color === piece.color;
             const isAttacking = attackingPieceId === piece.id;
+            const canMoveThisPiece = isCurrentPlayerPiece && waitingForMove && (
+              (piece.position === -1 && gameState.diceValue === 6) ||
+              (piece.position >= 0 && piece.position + gameState.diceValue <= 57)
+            );
             
             return (
               <div key={piece.id} 
@@ -411,8 +444,8 @@ export default function LudoGame() {
                 onMouseUp={closeFocus}
                 onTouchStart={() => { openFocus(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
                 onTouchEnd={closeFocus}
-                onClick={() => { if (isCurrentPlayerPiece && waitingForMove) movePiece(piece.id); }}
-                className={`absolute w-[5.33%] h-[5.33%] rounded-full border border-white flex items-center justify-center cursor-pointer shadow-md transition-all duration-200 ${isCurrentPlayerPiece && waitingForMove ? 'z-50 scale-125 border-yellow-400 border-2' : 'z-20'} ${piece.color === 'red' ? 'bg-red-500' : piece.color === 'blue' ? 'bg-blue-500' : piece.color === 'yellow' ? 'bg-yellow-500' : piece.color === 'green' ? 'bg-green-500' : 'bg-slate-500'}`}
+                onClick={() => { if (canMoveThisPiece) movePiece(piece.id); }}
+                className={`absolute w-[5.33%] h-[5.33%] rounded-full border border-white flex items-center justify-center cursor-pointer shadow-md transition-all duration-200 ${canMoveThisPiece ? 'z-50 scale-125 border-yellow-400 border-2' : 'z-20'} ${piece.color === 'red' ? 'bg-red-500' : piece.color === 'blue' ? 'bg-blue-500' : piece.color === 'yellow' ? 'bg-yellow-500' : piece.color === 'green' ? 'bg-green-500' : 'bg-slate-500'}`}
                 style={{ left: `${(col / 15) * 100 + 3.33}%`, top: `${(row / 15) * 100 + 3.33}%`, transform: 'translate(-50%, -50%)' }}>
                 <span className="text-[8px] sm:text-[10px] font-black text-white">{piece.hp}</span>
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-black/60 px-1 rounded-full text-[6px] sm:text-[8px] font-bold text-yellow-300 flex items-center gap-0.5">
