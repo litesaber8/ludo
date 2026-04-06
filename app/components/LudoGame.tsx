@@ -219,7 +219,7 @@ export default function LudoGame() {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer.isBot, waitingForMove, gameState.diceValue]);
+  }, [currentPlayer?.isBot, waitingForMove, gameState.diceValue, gameStarted, gameState.isGameOver, movePiece, currentPlayer?.pieces]);
 
   // Grid coordination map for 15x15 Ludo board
   const getTileCoords = (globalIdx: number, color?: Color, localPos?: number) => {
