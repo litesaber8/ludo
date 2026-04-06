@@ -26,6 +26,7 @@ export default function LudoGame() {
   const [waitingForMove, setWaitingForMove] = useState(false);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [hoveredPieceId, setHoveredPieceId] = useState<string | null>(null);
+  const [hoveredTile, setHoveredTile] = useState<{ globalIdx?: number; color?: Color; localPos?: number } | null>(null);
   const [focusedTile, setFocusedTile] = useState<{ globalIdx: number; color?: Color; localPos?: number } | null>(null);
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -396,9 +397,44 @@ export default function LudoGame() {
                     <div 
                       key={i} 
                       onClick={() => setFocusedTile({ globalIdx: gIdx })}
-                      className={`${bgColor} flex items-center justify-center text-[10px] font-bold cursor-pointer hover:bg-slate-200 transition-colors`}
+                      onMouseEnter={() => setHoveredTile({ globalIdx: gIdx })}
+                      onMouseLeave={() => setHoveredTile(null)}
+                      className={`${bgColor} relative flex items-center justify-center text-[10px] font-bold cursor-pointer hover:bg-slate-200 transition-colors`}
                     >
                       {content}
+
+                      {/* Mini Popup for Tile Pieces */}
+                      {hoveredTile?.globalIdx === gIdx && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white p-2 rounded-lg border border-slate-600 shadow-2xl z-[100] min-w-[120px] pointer-events-none animate-in fade-in slide-in-from-bottom-1">
+                          <div className="text-[9px] font-bold text-yellow-400 uppercase border-b border-slate-700 pb-1 mb-1 text-center flex items-center justify-center gap-1">
+                            <span>Tile {gIdx}</span>
+                            {SAFE_ZONES.includes(gIdx) && <span className="text-[8px] bg-slate-700 px-1 rounded text-white">SAFE</span>}
+                          </div>
+                          <div className="space-y-1">
+                            {gameState.players.flatMap(p => p.pieces)
+                              .filter(piece => getGlobalIndex(piece.position, piece.color) === gIdx && piece.position >= 0 && piece.position < 52)
+                              .map(p => {
+                                const owner = gameState.players.find(pl => pl.pieces.some(pc => pc.id === p.id));
+                                return (
+                                  <div key={p.id} className="flex flex-col gap-0.5 border-b border-slate-700/50 last:border-0 pb-1 last:pb-0">
+                                    <div className="flex items-center gap-1">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${owner?.color === 'red' ? 'bg-red-500' : owner?.color === 'blue' ? 'bg-blue-500' : owner?.color === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                                      <span className="text-[8px] font-bold truncate max-w-[80px]">{owner?.name}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[7px] font-medium text-slate-300">
+                                      <span>HP: <span className="text-pink-400 font-bold">{p.hp}</span></span>
+                                      <span>ATK: <span className="text-orange-400 font-bold">{p.attack}</span></span>
+                                      <span>RNG: <span className="text-blue-400 font-bold">{p.range}</span></span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            {gameState.players.flatMap(p => p.pieces).filter(piece => getGlobalIndex(piece.position, piece.color) === gIdx && piece.position >= 0 && piece.position < 52).length === 0 && (
+                              <div className="text-[7px] text-slate-500 text-center italic">Empty</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -414,9 +450,37 @@ export default function LudoGame() {
                       <div 
                         key={i} 
                         onClick={() => setFocusedTile({ globalIdx: 0, color, localPos: lp })}
-                        className={`${bgColor} flex items-center justify-center text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity border border-white/20`}
+                        onMouseEnter={() => setHoveredTile({ color, localPos: lp })}
+                        onMouseLeave={() => setHoveredTile(null)}
+                        className={`${bgColor} relative flex items-center justify-center text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity border border-white/20`}
                       >
                         {content}
+
+                        {/* Mini Popup for Home Stretch pieces */}
+                        {hoveredTile?.color === color && hoveredTile?.localPos === lp && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white p-2 rounded-lg border border-slate-600 shadow-2xl z-[100] min-w-[120px] pointer-events-none animate-in fade-in slide-in-from-bottom-1">
+                            <div className="text-[9px] font-bold text-yellow-400 uppercase border-b border-slate-700 pb-1 mb-1 text-center">
+                              {color} Stretch {lp - 51}
+                            </div>
+                            <div className="space-y-1">
+                              {gameState.players.find(p => p.color === color)?.pieces
+                                .filter(piece => piece.position === lp)
+                                .map(p => (
+                                  <div key={p.id} className="flex flex-col gap-0.5 border-b border-slate-700/50 last:border-0 pb-1 last:pb-0">
+                                    <div className="flex items-center gap-1">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${color === 'red' ? 'bg-red-500' : color === 'blue' ? 'bg-blue-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                                      <span className="text-[8px] font-bold truncate max-w-[80px]">Player {color}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[7px] font-medium text-slate-300">
+                                      <span>HP: <span className="text-pink-400 font-bold">{p.hp}</span></span>
+                                      <span>ATK: <span className="text-orange-400 font-bold">{p.attack}</span></span>
+                                      <span>RNG: <span className="text-blue-400 font-bold">{p.range}</span></span>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -632,7 +696,7 @@ export default function LudoGame() {
                       left: `${col * 30 + 15 + offsetX}px`,
                       top: `${row * 30 + 15 + offsetY}px`,
                       transform: 'translate(-50%, -50%)',
-                      zIndex: (isMyTurn ? 50 : 20) + index + (isSelected || isHovered ? 30 : 0),
+                      zIndex: (isMyTurn ? 60 : 20) + index + (isSelected || isHovered ? 40 : 0),
                       boxShadow: isHovered || piece.hp > 1 ? `0 0 0 ${Math.min(piece.hp * 2, 8)}px rgba(255,255,255,0.2), 0 0 ${10 + piece.hp * 5}px rgba(255,255,255,${0.2 + 0.1 * piece.hp})` : 'none',
                       filter: isHovered ? 'brightness(1.2) contrast(1.1)' : 'none'
                     }}
@@ -640,7 +704,7 @@ export default function LudoGame() {
                     <div className="text-[10px] font-black text-white leading-none">{piece.hp}</div>
                     
                     {/* Stats Popup on Hover */}
-                    {isHovered && (
+                    {isHovered && !hoveredTile && (
                       <div className="absolute bottom-full mb-2 bg-slate-800 text-white p-2 rounded-lg border border-slate-600 shadow-xl z-[100] min-w-[80px] pointer-events-none animate-in fade-in slide-in-from-bottom-1">
                         <div className="text-[10px] font-bold text-yellow-400 uppercase border-b border-slate-700 pb-1 mb-1">{player.name}</div>
                         <div className="flex justify-between items-center gap-2">
