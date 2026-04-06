@@ -28,22 +28,30 @@ export const BUFF_LOCATIONS: Record<number, TileType> = {
 
 export const SAFE_ZONES = [0, 8, 13, 21, 26, 34, 39, 47];
 
-export const createInitialPlayers = (isOnline: boolean, botCount: number): Player[] => {
-  return COLORS.map((color, index) => ({
-    id: `player-${color}`,
-    name: `Player ${color.toUpperCase()}`,
-    color,
-    isBot: index > (isOnline ? 0 : 0) && index <= botCount, // Logic to determine bots
-    pieces: Array.from({ length: 4 }, (_, i) => ({
-      id: `${color}-${i}`,
-      color,
-      position: -1,
-      hp: 1,
-      attack: 1,
-      range: 0,
-      buffs: [],
-    })),
-  }));
+export interface PlayerConfig {
+  color: Color;
+  isBot: boolean;
+  isActive: boolean;
+}
+
+export const createInitialPlayers = (configs: PlayerConfig[]): Player[] => {
+  return configs
+    .filter(conf => conf.isActive)
+    .map((conf) => ({
+      id: `player-${conf.color}`,
+      name: `Player ${conf.color.toUpperCase()}${conf.isBot ? ' (BOT)' : ''}`,
+      color: conf.color,
+      isBot: conf.isBot,
+      pieces: Array.from({ length: 4 }, (_, i) => ({
+        id: `${conf.color}-${i}`,
+        color: conf.color,
+        position: -1,
+        hp: 1,
+        attack: 1,
+        range: 0,
+        buffs: [],
+      })),
+    }));
 };
 
 export const getTileType = (index: number): TileType => {
