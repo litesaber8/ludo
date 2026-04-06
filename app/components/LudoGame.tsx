@@ -35,7 +35,7 @@ export default function LudoGame() {
     if (focusTimer) clearTimeout(focusTimer);
     const timer = setTimeout(() => {
       setFocusedTile(null);
-    }, 300); // 300ms delay to move mouse
+    }, 800); // Increased to 800ms for more travel time
     setFocusTimer(timer);
   }, [focusTimer]);
 
