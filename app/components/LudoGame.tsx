@@ -27,12 +27,28 @@ export default function LudoGame() {
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [focusedTile, setFocusedTile] = useState<{ globalIdx: number; color?: Color; localPos?: number } | null>(null);
   const [attackingPieceId, setAttackingPieceId] = useState<string | null>(null);
+  const [focusTimer, setFocusTimer] = useState<NodeJS.Timeout | null>(null);
   
   const currentPlayer = gameState.players[gameState.currentPlayerIndex] || { name: 'Player', color: 'red', pieces: [], isBot: false };
 
   const closeFocus = useCallback(() => {
-    setFocusedTile(null);
-  }, []);
+    if (focusTimer) clearTimeout(focusTimer);
+    const timer = setTimeout(() => {
+      setFocusedTile(null);
+    }, 500); // 500ms delay to move mouse
+    setFocusTimer(timer);
+  }, [focusTimer]);
+
+  const keepFocus = useCallback(() => {
+    if (focusTimer) clearTimeout(focusTimer);
+    setFocusTimer(null);
+  }, [focusTimer]);
+
+  const openFocus = useCallback((data: { globalIdx: number; color?: Color; localPos?: number }) => {
+    if (focusTimer) clearTimeout(focusTimer);
+    setFocusedTile(data);
+    setFocusTimer(null);
+  }, [focusTimer]);
 
   const rollDice = useCallback(() => {
     if (isRolling || waitingForMove || gameState.isGameOver) return;
@@ -315,19 +331,17 @@ export default function LudoGame() {
                     key={i} 
                     onMouseEnter={() => {
                       const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
-                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                      if (hasPiece) openFocus({ globalIdx: pathIdx });
                     }}
-                    onMouseLeave={() => {
-                      // Do nothing here, allow the popup's own onMouseLeave or manual close
-                    }}
+                    onMouseLeave={closeFocus}
                     onMouseDown={() => {
                       const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
-                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                      if (hasPiece) openFocus({ globalIdx: pathIdx });
                     }}
                     onMouseUp={closeFocus}
                     onTouchStart={() => {
                       const hasPiece = gameState.players.some(player => player.pieces.some(p => getGlobalIndex(p.position, p.color) === pathIdx && p.position < 52 && p.position >= 0));
-                      if (hasPiece) setFocusedTile({ globalIdx: pathIdx });
+                      if (hasPiece) openFocus({ globalIdx: pathIdx });
                     }}
                     onTouchEnd={closeFocus}
                     className={`${bgColor} flex items-center justify-center cursor-pointer select-none`}
@@ -347,17 +361,17 @@ export default function LudoGame() {
                         key={i} 
                         onMouseEnter={() => {
                           const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
-                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                          if (hasPiece) openFocus({ globalIdx: 0, color, localPos: lp });
                         }}
-                        onMouseLeave={() => {}}
+                        onMouseLeave={closeFocus}
                         onMouseDown={() => {
                           const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
-                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                          if (hasPiece) openFocus({ globalIdx: 0, color, localPos: lp });
                         }}
                         onMouseUp={closeFocus}
                         onTouchStart={() => {
                           const hasPiece = gameState.players.some(player => player.pieces.some(p => p.color === color && p.position === lp));
-                          if (hasPiece) setFocusedTile({ globalIdx: 0, color, localPos: lp });
+                          if (hasPiece) openFocus({ globalIdx: 0, color, localPos: lp });
                         }}
                         onTouchEnd={closeFocus}
                         className={`${bgColor} flex items-center justify-center cursor-pointer border border-white/20 select-none`}
@@ -391,11 +405,11 @@ export default function LudoGame() {
             
             return (
               <div key={piece.id} 
-                onMouseEnter={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
-                onMouseLeave={() => {}}
-                onMouseDown={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
+                onMouseEnter={() => { openFocus(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
+                onMouseLeave={closeFocus}
+                onMouseDown={() => { openFocus(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
                 onMouseUp={closeFocus}
-                onTouchStart={() => { setFocusedTile(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
+                onTouchStart={() => { openFocus(piece.position >= 52 ? { globalIdx: 0, color: piece.color, localPos: piece.position } : { globalIdx: getGlobalIndex(piece.position, piece.color) }); }}
                 onTouchEnd={closeFocus}
                 onClick={() => { if (isCurrentPlayerPiece && waitingForMove) movePiece(piece.id); }}
                 className={`absolute w-[5.33%] h-[5.33%] rounded-full border border-white flex items-center justify-center cursor-pointer shadow-md transition-all duration-200 ${isCurrentPlayerPiece && waitingForMove ? 'z-50 scale-125 border-yellow-400 border-2' : 'z-20'} ${piece.color === 'red' ? 'bg-red-500' : piece.color === 'blue' ? 'bg-blue-500' : piece.color === 'yellow' ? 'bg-yellow-500' : piece.color === 'green' ? 'bg-green-500' : 'bg-slate-500'}`}
@@ -442,7 +456,8 @@ export default function LudoGame() {
       {focusedTile && (
         <div 
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-[90%] max-w-[280px]" 
-          onMouseLeave={() => setFocusedTile(null)}
+          onMouseEnter={keepFocus}
+          onMouseLeave={closeFocus}
         >
           <div className="bg-slate-800/95 backdrop-blur-md border border-slate-600 rounded-xl p-3 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-yellow-400/30"></div>
